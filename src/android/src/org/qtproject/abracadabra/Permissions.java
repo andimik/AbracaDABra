@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
@@ -18,6 +19,7 @@ public class Permissions {
     private static final String TAG = "Permissions";
     private static final int REQ_STORAGE = 1001;
     private static final int REQ_NOTIFICATIONS = 1002;
+    private static final int REQ_MANAGE_STORAGE = 1003;
     
     // Callback interface for permission results
     public interface PermissionCallback {
@@ -169,7 +171,7 @@ public class Permissions {
     private static void showNotificationRationaleDialog(final Activity activity, final String permission) {
         new AlertDialog.Builder(activity)
                 .setTitle("Notification Permission Needed")
-                .setMessage("AbracaDABra needs notification permission to show the playback indicator and keep audio playing in the background.\n\nWithout this permission, audio will stop when you switch to another app.")
+                .setMessage("AbracaDABra needs notification permission to show the playback indicator and keep audio playing in the background.\n\nWithout this permission, audio will stop when you leave the app.")
                 .setPositiveButton("Allow", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -215,6 +217,12 @@ public class Permissions {
         Activity activity = (ctx instanceof Activity) ? (Activity) ctx : null;
         if (activity == null) return;
 
+        // For Android 11+, request MANAGE_EXTERNAL_STORAGE to access Android/data folder
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            requestManageExternalStoragePermission(activity);
+            return;
+        }
+
         String permission;
         String rationale;
 
@@ -236,6 +244,58 @@ public class Permissions {
 
         // Show rationale dialog before requesting permission
         showRationaleDialog(activity, permission, rationale);
+    }
+
+    /**
+     * Request MANAGE_EXTERNAL_STORAGE permission for Android 11+
+     * This allows access to app-specific folders like Android/data
+     */
+    private static void requestManageExternalStoragePermission(final Activity activity) {
+        if (activity == null) return;
+
+        // Check if permission is already granted
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
+            Log.d(TAG, "MANAGE_EXTERNAL_STORAGE permission already granted");
+            return;
+        }
+
+        Log.d(TAG, "Requesting MANAGE_EXTERNAL_STORAGE permission");
+
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                new AlertDialog.Builder(activity)
+                        .setTitle("Storage Access Needed")
+                        .setMessage("AbracaDABra needs permission to access all files on your device, including your own recording folder in Android/data.\n\nThis is required to open raw recordings and raw file streams.")
+                        .setPositiveButton("Allow", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                try {
+                                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                                    intent.setData(Uri.parse("package:" + activity.getPackageName()));
+                                    activity.startActivity(intent);
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Failed to open file access settings: " + e.getMessage());
+                                    // Fallback to general all files access settings
+                                    try {
+                                        Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                                        activity.startActivity(intent);
+                                    } catch (Exception e2) {
+                                        Toast.makeText(activity, "Please enable 'All Files' access for this app in Settings.", Toast.LENGTH_LONG).show();
+                                    }
+                                }
+                            }
+                        })
+                        .setNegativeButton("Deny", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                Toast.makeText(activity, "Permission denied. You can enable it in app settings. As a workaround, copy files to Download folder.", Toast.LENGTH_LONG).show();
+                            }
+                        })
+                        .setCancelable(false)
+                        .show();
+            }
+        });
     }
 
     private static void showRationaleDialog(Activity activity, final String permission, String message) {
