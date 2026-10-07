@@ -30,6 +30,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLoggingCategory>
+#include <QSettings>
+#include <QStandardPaths>
 #include <algorithm>
 
 #include "audiorecorder.h"
@@ -208,6 +210,9 @@ bool DabCliApp::start()
     }
 
     m_audioRecorder = new AudioRecorder();
+    const QString defaultDataPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/AbracaDABra";
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("AbracaDABra"), QStringLiteral("AbracaDABra"));
+    m_audioRecorder->setup(settings.value("dataStoragePath", defaultDataPath).toString());
 
 #if HAVE_FDKAAC
     m_audioDecoder = new AudioDecoderFDKAAC(m_audioRecorder);
@@ -222,6 +227,10 @@ bool DabCliApp::start()
     m_audioRecorder->moveToThread(m_audioDecoderThread);
     connect(m_audioDecoderThread, &QThread::finished, m_audioDecoder, &QObject::deleteLater);
     connect(m_audioDecoderThread, &QThread::finished, m_audioRecorder, &QObject::deleteLater);
+    connect(this, &DabCliApp::recordingStartRequested, m_audioRecorder, &AudioRecorder::start, Qt::QueuedConnection);
+    connect(this, &DabCliApp::recordingStopRequested, m_audioRecorder, &AudioRecorder::stop, Qt::QueuedConnection);
+    connect(m_audioRecorder, &AudioRecorder::recordingStarted, this, &DabCliApp::onRecordingStarted, Qt::QueuedConnection);
+    connect(m_audioRecorder, &AudioRecorder::recordingStopped, this, &DabCliApp::onRecordingStopped, Qt::QueuedConnection);
     m_audioDecoderThread->start();
 
     // RadioControl <-> AudioDecoder wiring (mirrors Application::Application())
@@ -508,6 +517,43 @@ int DabCliApp::volumePercent() const
     return m_volumePercent;
 }
 
+void DabCliApp::toggleRecording()
+{
+    bool recording;
+    bool ready;
+    {
+        QMutexLocker lock(&m_mutex);
+        if (m_recordingPending)
+        {
+            return;
+        }
+        recording = m_recording;
+        ready = m_isPlaying && m_haveAudioParams;
+        m_recordingPending = true;
+    }
+
+    if (recording)
+    {
+        emit recordingStopRequested();
+    }
+    else if (ready)
+    {
+        emit recordingStartRequested();
+    }
+    else
+    {
+        QMutexLocker lock(&m_mutex);
+        m_recordingPending = false;
+        qCWarning(cliApp) << "Cannot start recording: no active audio service";
+    }
+}
+
+bool DabCliApp::recordingActive() const
+{
+    QMutexLocker lock(&m_mutex);
+    return m_recording;
+}
+
 void DabCliApp::toggleMute()
 {
     int current;
@@ -748,6 +794,20 @@ void DabCliApp::onAudioParametersInfo(const AudioParameters &params)
     m_haveAudioParams = true;
 }
 
+void DabCliApp::onRecordingStarted(const QString &, const QString &)
+{
+    QMutexLocker lock(&m_mutex);
+    m_recording = true;
+    m_recordingPending = false;
+}
+
+void DabCliApp::onRecordingStopped()
+{
+    QMutexLocker lock(&m_mutex);
+    m_recording = false;
+    m_recordingPending = false;
+}
+
 void DabCliApp::currentAudioFormat(int *sampleRate, int *numChannels) const
 {
     QMutexLocker lock(&m_mutex);
@@ -802,6 +862,7 @@ QJsonObject DabCliApp::statusJson() const
     root["syncLevel"] = m_syncLevel;
     root["snr"] = double(m_snr);
     root["volumePercent"] = m_volumePercent;
+    root["recording"] = m_recording;
 
     QJsonObject ensembleObj;
     ensembleObj["label"] = m_ensemble.label;

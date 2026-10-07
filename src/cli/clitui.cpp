@@ -146,6 +146,7 @@ bool CliTui::start()
                                            const double snr = m_status.value("snr").toDouble();
                                            const QString channel = m_status.value("channel").toString();
                                            const double freqKHz = m_status.value("frequencyKHz").toDouble();
+                                           const bool recording = m_status.value("recording").toBool();
 
                                            const std::string syncStr = sync >= 2 ? "SYNC" : (sync == 0 ? "NO SIGNAL" : "SEARCHING");
                                            const Color syncColor = sync >= 2 ? Color::Green : (sync == 0 ? Color::Red : Color::Yellow);
@@ -194,7 +195,9 @@ bool CliTui::start()
                                                                   .arg(freqKHz > 0 ? QString(" (%1 kHz)").arg(freqKHz) : QString())
                                                                   .toStdString())}),
                                                    hbox({text("Signal: "), text(syncStr) | color(syncColor),
-                                                         text(QString("   SNR: %1 dB").arg(snr, 0, 'f', 1).toStdString()), filler(),
+                                                       text(QString("   SNR: %1 dB").arg(snr, 0, 'f', 1).toStdString()), filler(),
+                                                       recording ? (text("● REC") | color(Color::Red)) : text(""),
+                                                       recording ? text("   ") : text(""),
                                                          text(QString("Volume: %1%2")
                                                                   .arg(volumePercent == 0 ? QStringLiteral("muted") : QString::number(volumePercent))
                                                                   .arg(volumePercent == 0 ? QString() : QStringLiteral("%"))
@@ -340,7 +343,7 @@ bool CliTui::start()
                                                footerLines.push_back(text(m_statusMessage.toStdString()) | color(Color::Red));
                                            }
                                            QString hint = QStringLiteral(
-                                               "Left/Right: switch panel   Up/Down: navigate   Enter: tune/play   +/-: volume   m: mute   q: quit");
+                                               "Left/Right: switch panel   Up/Down: navigate   Enter: tune/play   r: record   +/-: volume   m: mute   q: quit");
                                            if (m_verboseLevel > 0)
                                            {
                                                hint += QString("   (verbosity v%1)").arg(m_verboseLevel);
@@ -371,6 +374,11 @@ bool CliTui::start()
                                            if (event == Event::Character('m'))
                                            {
                                                m_app->toggleMute();
+                                               return true;
+                                           }
+                                           if (event == Event::Character('r') || event == Event::Character('R'))
+                                           {
+                                               m_app->toggleRecording();
                                                return true;
                                            }
                                            return false;

@@ -122,6 +122,8 @@ public:
     // percent in [0, 100]; no-op if local audio output (HAVE_PORTAUDIO / TUI mode) isn't active
     void setVolume(int percent);
     int volumePercent() const;
+    void toggleRecording();
+    bool recordingActive() const;
 
     // toggles volumePercent() between 0 and the level it had before muting; invokable so it can
     // be triggered by desktop media-key/MPRIS Play-Pause commands (see linuxSetupMediaRemoteCommands)
@@ -146,6 +148,8 @@ signals:
 
     // emitted once the graceful shutdown requested via requestShutdown() has completed
     void readyToQuit();
+    void recordingStartRequested();
+    void recordingStopRequested();
 
 private slots:
     void onEnsembleInformation(const RadioControlEnsemble &ens);
@@ -155,6 +159,8 @@ private slots:
     void onTuneDone(uint32_t freq);
     void onAudioServiceSelection(const RadioControlServiceComponent &s);
     void onAudioParametersInfo(const AudioParameters &params);
+    void onRecordingStarted(const QString &recpath, const QString &filename);
+    void onRecordingStopped();
     void onInputDeviceReady();
     void onInputDeviceError(InputDevice::ErrorCode errCode);
     void onDlComplete(const QString &dl);
@@ -204,6 +210,8 @@ private:
     uint8_t m_currentScids = 0;
     QString m_currentServiceLabel;
     bool m_isPlaying = false;
+    bool m_recording = false;
+    bool m_recordingPending = false;
     AudioParameters m_audioParams{};
     bool m_haveAudioParams = false;
     bool m_deviceReady = false;
