@@ -442,6 +442,14 @@ bool DabCliApp::requestTuneFrequency(uint32_t freqKHz, QString *errorOut)
         m_currentServiceLabel.clear();
         m_isPlaying = false;
         m_haveAudioParams = false;
+        m_ensemble = RadioControlEnsemble{};
+        m_dlsText.clear();
+        m_dlPlusTitle.clear();
+        m_dlPlusArtist.clear();
+        m_dlPlusTags.clear();
+        m_slideData.clear();
+        m_slideContentType.clear();
+        ++m_slideVersion;
     }
 
     emit tuneServiceRequested(freqKHz, m_config.haveInitialService ? m_config.initialSid : 0,
