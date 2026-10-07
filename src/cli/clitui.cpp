@@ -105,6 +105,18 @@ bool CliTui::start()
 
     MenuOption channelOption = MenuOption::Vertical();
     channelOption.on_enter = [this] { tuneSelectedChannel(); };
+    channelOption.entries_option.transform = [](const EntryState &state) {
+        Element element = text(state.label);
+        if (state.focused)
+        {
+            element = element | inverted;
+        }
+        if (state.active)
+        {
+            element = element | bold;
+        }
+        return element;
+    };
     Component channelMenu = Menu(&m_channelEntries, &m_selectedChannel, channelOption);
 
     MenuOption serviceOption = MenuOption::Vertical();
@@ -394,9 +406,17 @@ void CliTui::refreshStatus()
     m_status = m_app->statusJson();
 
     const QJsonObject current = m_status.value("current").toObject();
+    const QString currentChannel = m_status.value("channel").toString();
     const bool servicePlaying = current.value("playing").toBool();
     const uint32_t currentSid = current.value("sid").toString().toUInt(nullptr, 0);
     const uint8_t currentScids = uint8_t(current.value("scids").toInt());
+    m_channelEntries.clear();
+    for (const uint32_t freq : m_channelFreqKHz)
+    {
+        const QString label = DabTables::channelList.value(freq);
+        const bool isCurrentChannel = !currentChannel.isEmpty() && label == currentChannel;
+        m_channelEntries.push_back(QString("%1%2").arg(isCurrentChannel ? QStringLiteral("> ") : QStringLiteral("  "), label).toStdString());
+    }
     const QJsonArray services = m_status.value("services").toArray();
     m_serviceEntries.clear();
     m_serviceSid.clear();
