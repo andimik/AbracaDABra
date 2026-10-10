@@ -356,6 +356,20 @@ bool CliTui::start()
     Component withEvents = CatchEvent(rootRenderer,
                                        [this](Event event) -> bool
                                        {
+                                           if (event.is_mouse() && event.mouse().button == Mouse::Left &&
+                                               event.mouse().motion == Mouse::Released)
+                                           {
+                                               if (event.mouse().x < kChannelsWidth)
+                                               {
+                                                   m_screen->Post([this] { tuneSelectedChannel(); });
+                                                   return false;
+                                               }
+                                               if (event.mouse().x < kChannelsWidth + kServiceWidth)
+                                               {
+                                                   m_screen->Post([this] { playSelectedService(); });
+                                                   return false;
+                                               }
+                                           }
                                            if (event == Event::Character('q') || event.input() == std::string(1, 3))
                                            {
                                                m_screen->Exit();
