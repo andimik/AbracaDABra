@@ -697,6 +697,7 @@ void DabCliApp::onAudioServiceSelection(const RadioControlServiceComponent &s)
     m_dlPlusTags.clear();
     m_slideData.clear();
     m_slideContentType.clear();
+    m_slideFileName.clear();
     ++m_slideVersion;
     qCInfo(cliApp).noquote() << "Now playing:" << s.label;
 #if defined(Q_OS_LINUX) && HAVE_LINUX_DBUS
@@ -763,6 +764,7 @@ void DabCliApp::onCurrentSlide(const Slide &slide)
     m_slideData = slide.getRawData();
     const QString &format = slide.getFormat();
     m_slideContentType = format.contains("PNG", Qt::CaseInsensitive) ? QStringLiteral("image/png") : QStringLiteral("image/jpeg");
+    m_slideFileName = slide.getContentName();
     ++m_slideVersion;
 }
 
@@ -890,6 +892,7 @@ QJsonObject DabCliApp::statusJson() const
     }
     currentObj["dlPlusTags"] = dlPlusTagsArr;
     currentObj["slideVersion"] = m_slideData.isEmpty() ? 0 : m_slideVersion;
+    currentObj["slideFileName"] = m_slideData.isEmpty() ? QString() : m_slideFileName;
     if (m_haveAudioParams)
     {
         QJsonObject audioObj;

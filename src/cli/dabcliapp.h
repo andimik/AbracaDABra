@@ -229,6 +229,7 @@ private:
 
     QByteArray m_slideData;
     QString m_slideContentType;
+    QString m_slideFileName;
     int m_slideVersion = 0;
 
     float m_freqOffsetHz = 0.0f;

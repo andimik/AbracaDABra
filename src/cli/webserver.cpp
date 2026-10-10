@@ -462,6 +462,12 @@ QString WebServer::indexHtml()
   .statusRow { display:flex; gap:1rem; align-items:flex-start; flex-wrap:wrap; }
   #slide { width:160px; height:160px; object-fit:contain; border-radius:6px; background:#222; border:1px solid #333; display:none; }
   #slide.visible { display:block; }
+  #slide.visible { cursor:zoom-in; }
+  #slideViewer { position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center; padding:2rem; background:rgba(0,0,0,.88); }
+  #slideViewer.visible { display:flex; }
+  .slideViewerPanel { max-width:min(100%, 1100px); max-height:100%; overflow:auto; background:#1b1b1b; border:1px solid #444; border-radius:8px; padding:1rem; }
+  #enlargedSlide { display:block; max-width:100%; max-height:70vh; margin:0 auto 1rem; object-fit:contain; background:#222; }
+  .slideViewerClose { float:right; }
   details.card summary { cursor:pointer; font-weight:600; }
   details.card[open] summary { margin-bottom:.75rem; }
 </style>
@@ -487,6 +493,20 @@ QString WebServer::indexHtml()
     <div class="stat"><label>Now playing</label><span id="nowplaying">-</span></div>
     <div class="stat"><label>Title</label><span id="title">-</span></div>
     <div class="stat"><label>DL Plus info</label><span id="dlPlusTags">-</span></div>
+  </div>
+</div>
+
+<div id="slideViewer" role="dialog" aria-modal="true" aria-labelledby="slideViewerTitle">
+  <div class="slideViewerPanel">
+    <button class="slideViewerClose" id="closeSlideViewer" type="button">Close</button>
+    <h2 id="slideViewerTitle">Slideshow image</h2>
+    <img id="enlargedSlide" alt="Enlarged station image">
+    <div class="grid">
+      <div class="stat"><label>Size</label><span id="slideSize">-</span></div>
+      <div class="stat"><label>Dimensions</label><span id="slideDimensions">-</span></div>
+      <div class="stat"><label>File type</label><span id="slideType">-</span></div>
+      <div class="stat"><label>File name</label><span id="slideFileName">-</span></div>
+    </div>
   </div>
 </div>
 
@@ -537,6 +557,34 @@ async function tune(){
 }
 
 let lastSlideVersion = 0;
+let currentSlideFileName = '';
+const slideImg = document.getElementById('slide');
+const slideViewer = document.getElementById('slideViewer');
+const enlargedSlide = document.getElementById('enlargedSlide');
+
+async function openSlideViewer(){
+  if (!slideImg.src || !slideImg.classList.contains('visible')) return;
+  slideViewer.classList.add('visible');
+  enlargedSlide.src = slideImg.currentSrc || slideImg.src;
+  document.getElementById('slideFileName').textContent = currentSlideFileName || '-';
+  enlargedSlide.onload = () => {
+    document.getElementById('slideDimensions').textContent = enlargedSlide.naturalWidth + ' x ' + enlargedSlide.naturalHeight + ' pixels';
+  };
+  try {
+    const response = await fetch(enlargedSlide.src, {cache:'no-store'});
+    const blob = await response.blob();
+    document.getElementById('slideSize').textContent = (blob.size / 1024).toFixed(1) + ' kB';
+    document.getElementById('slideType').textContent = blob.type || 'Unknown';
+  } catch (e) {
+    document.getElementById('slideSize').textContent = '-';
+    document.getElementById('slideType').textContent = '-';
+  }
+}
+function closeSlideViewer(){ slideViewer.classList.remove('visible'); }
+slideImg.addEventListener('click', openSlideViewer);
+document.getElementById('closeSlideViewer').addEventListener('click', closeSlideViewer);
+slideViewer.addEventListener('click', (event) => { if (event.target === slideViewer) closeSlideViewer(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSlideViewer(); });
 )HTML");
 
 #if HAVE_MP3LAME
@@ -776,6 +824,7 @@ async function refresh(){
 
     const slideImg = document.getElementById('slide');
     const slideVersion = (s.current && s.current.slideVersion) || 0;
+    currentSlideFileName = (s.current && s.current.slideFileName) || '';
     if (slideVersion && slideVersion !== lastSlideVersion) {
       lastSlideVersion = slideVersion;
       slideImg.src = '/api/slideshow?v=' + slideVersion;
