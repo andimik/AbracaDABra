@@ -343,7 +343,7 @@ bool CliTui::start()
                                                footerLines.push_back(text(m_statusMessage.toStdString()) | color(Color::Red));
                                            }
                                            QString hint = QStringLiteral(
-                                               "Left/Right: switch panel   Up/Down: navigate   Enter: tune/play   r: record   +/-: volume   m: mute   q: quit");
+                                               "←/→ & ↑/↓: navigate  Enter: tune/play  r: record  +/-: volume  m: mute  q: quit");
                                            if (m_verboseLevel > 0)
                                            {
                                                hint += QString("   (verbosity v%1)").arg(m_verboseLevel);
